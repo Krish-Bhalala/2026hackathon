@@ -67,8 +67,19 @@ export class RouteOptimizer {
         boxes: Box[],
         routeIds: string[]
     ): number | null {
-        // TODO: implement this method
-        throw new Error('Not implemented');
+        if (routeIds.length === 0) return 0
+
+        // build a list of locations
+        const locations = routeIds.map((id) => boxes.find((box) => box.id === id)?.location)
+        locations.unshift(technician.startLocation)
+        if (!locations.every((x): x is Location => x !== undefined)) return null
+
+        let sum = 0
+        for (let i = 0; i < locations.length - 1; i++) {
+            sum += this.haversineDistance(locations[i], locations[i + 1])
+        }
+
+        return sum
     }
 
     findShortestRoute(technician: Technician, boxes: Box[]): RouteResult {
