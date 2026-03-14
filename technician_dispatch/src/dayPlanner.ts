@@ -123,8 +123,50 @@ export class DayPlanner {
     }
 
     planDay(technician: Technician, boxes: Box[]): DayPlanResult {
-        // TODO: implement this method
-        throw new Error('Not implemented');
+        let output: DayPlanResult = {
+            technicianId: technician.id,
+            plannedRoute: [],
+            totalTimeUsedMinutes: 0,
+            boxesFixed: 0,
+            skippedBoxIds: [],
+        }
+
+        let visited: boolean[] = new Array(boxes.length + 1).fill(false)
+        visited[visited.length - 1] = true // technician start location is visited
+
+        let currentLocation = technician.startLocation
+
+        while (visited.some(x => !x)) {
+            // find next shortest trip + fix time
+            let minTimeInMinutes = Infinity
+            let nextIndex = -1
+            for (let i = 0; i < boxes.length; i++) {
+                if (visited[i]) continue
+                let boxTimeInMinutes = this.travelTimeMinutes(currentLocation, boxes[i].location, technician.speedKmh) + boxes[i].fixTimeMinutes
+                if (boxTimeInMinutes < minTimeInMinutes) {
+                    minTimeInMinutes = boxTimeInMinutes
+                    nextIndex = i
+                }
+            }
+            // make sure this trip fits in the technician's day
+            const totalCost = minTimeInMinutes + output.totalTimeUsedMinutes
+            if (totalCost > technician.workingMinutes) {
+                break
+            }
+
+            output.plannedRoute.push(boxes[nextIndex].id)
+            output.totalTimeUsedMinutes += minTimeInMinutes
+            output.boxesFixed++
+            visited[nextIndex] = true
+            currentLocation = boxes[nextIndex].location
+        }
+
+        // track skipped boxes
+        output.skippedBoxIds = boxes
+            .filter((_, index) => !visited[index])
+            .map(box => box.id)
+
+        return output
     }
 
     validateTechnician(technician: Technician): boolean {
