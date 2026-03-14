@@ -72,6 +72,8 @@ export class RouteOptimizer {
         // build a list of locations
         const locations = routeIds.map((id) => boxes.find((box) => box.id === id)?.location)
         locations.unshift(technician.startLocation)
+
+        // narrow the type to not be undefined
         if (!locations.every((x): x is Location => x !== undefined)) return null
 
         let sum = 0
@@ -83,7 +85,36 @@ export class RouteOptimizer {
     }
 
     findShortestRoute(technician: Technician, boxes: Box[]): RouteResult {
-        // TODO: implement this method
-        throw new Error('Not implemented');
+        let output: RouteResult = {
+            technicianId: technician.id,
+            route: [],
+            totalDistanceKm: 0,
+        }
+
+        let visited: boolean[] = Array(boxes.length + 1).fill(false)
+        visited[visited.length - 1] = true // technician start location is visited
+
+        let currentLocation = technician.startLocation
+
+        while (visited.some(x => !x)) {
+
+            // find next closest box
+            let minDistance = Number.MAX_VALUE
+            let nextId = -1
+            for (let i = 0; i < boxes.length; i++) {
+                if (visited[i]) continue
+                let dist = this.haversineDistance(currentLocation, boxes[i].location)
+                if (dist < minDistance) {
+                    minDistance = dist
+                    nextId = i
+                }
+            }
+
+            output.route.push(boxes[nextId].id)
+            output.totalDistanceKm += minDistance
+            visited[nextId] = true
+            currentLocation = boxes[nextId].location
+        }
+        return output
     }
 }
