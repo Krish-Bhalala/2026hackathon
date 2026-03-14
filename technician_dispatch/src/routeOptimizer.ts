@@ -100,20 +100,20 @@ export class RouteOptimizer {
 
             // find next closest box
             let minDistance = Number.MAX_VALUE
-            let nextId = -1
+            let nextIdx = -1
             for (let i = 0; i < boxes.length; i++) {
                 if (visited[i]) continue
                 let dist = this.haversineDistance(currentLocation, boxes[i].location)
                 if (dist < minDistance) {
                     minDistance = dist
-                    nextId = i
+                    nextIdx = i
                 }
             }
 
-            output.route.push(boxes[nextId].id)
+            output.route.push(boxes[nextIdx].id)
             output.totalDistanceKm += minDistance
-            visited[nextId] = true
-            currentLocation = boxes[nextId].location
+            visited[nextIdx] = true
+            currentLocation = boxes[nextIdx].location
         }
         return output
     }
