@@ -78,23 +78,40 @@ export class TeamSizer {
         boxes: Box[],
         routeIds: string[]
     ): number | null {
-        // sum over trip time and fixing time
-        let totalTimeInMinutes = 0
+        let totalTimeInMinutes = 0;
 
-        const boxMap = new Map<string, Box>()
-        for (const box of boxes) boxMap.set(box.id, box)
+        const boxMap = new Map<string, Box>();
+        for (const box of boxes) boxMap.set(box.id, box);
 
-        let prevLocation = startLocation
+        let prevLocation = startLocation;
         for (const routeId of routeIds) {
-            const box = boxMap.get(routeId)
-            if (!box) return null
+            const box = boxMap.get(routeId);
+            if (!box) return null;
 
-            totalTimeInMinutes += this.travelTimeMinutes(prevLocation, box.location, speedKmh)
-            totalTimeInMinutes += box.fixTimeMinutes
-            prevLocation = box.location
+            totalTimeInMinutes += this.travelTimeMinutes(prevLocation, box.location, speedKmh);
+            totalTimeInMinutes += box.fixTimeMinutes;
+            prevLocation = box.location;
         }
 
-        return totalTimeInMinutes
+        return totalTimeInMinutes;
+    }
+
+    getClosestTechnician(
+        location: Location,
+        technicianLocations: Location[]
+    ): number {
+        let bestIndex = 0;
+        let bestDistance = Infinity;
+
+        for (let i = 0; i < technicianLocations.length; i++) {
+            const dist = this.haversineDistance(technicianLocations[i], location);
+            if (dist < bestDistance) {
+                bestDistance = dist;
+                bestIndex = i;
+            }
+        }
+
+        return bestIndex;
     }
 
     tryAssign(
@@ -104,8 +121,90 @@ export class TeamSizer {
         numTechnicians: number,
         deadlineMinutes: number
     ): TechnicianAssignment[] | null {
-        // TODO: implement this method
-        throw new Error('Not implemented');
+        if (boxes.length === 0) {
+            return Array.from({ length: numTechnicians }, (_, i) => ({
+                technicianLabel: `Technician ${i + 1}`,
+                assignedBoxIds: [],
+                totalTimeMinutes: 0,
+            }));
+        }
+
+        for (const box of boxes) {
+            const solo =
+                this.travelTimeMinutes(startLocation, box.location, speedKmh) +
+                box.fixTimeMinutes;
+            if (solo > deadlineMinutes) return null;
+        }
+
+        // Sort boxes farthest-first from start (furthest-fit decreasing)
+        const sortedBoxes = [...boxes].sort((a, b) => {
+            const distA = this.haversineDistance(startLocation, a.location);
+            const distB = this.haversineDistance(startLocation, b.location);
+            return distB - distA;
+        });
+
+        const assignments: TechnicianAssignment[] = Array.from(
+            { length: numTechnicians },
+            (_, i) => ({
+                technicianLabel: `Technician ${i + 1}`,
+                assignedBoxIds: [],
+                totalTimeMinutes: 0,
+            })
+        );
+        const techLocations: Location[] = Array.from(
+            { length: numTechnicians },
+            () => ({ ...startLocation })
+        );
+
+        for (const box of sortedBoxes) {
+            const nearestIdx = this.getClosestTechnician(
+                box.location,
+                techLocations
+            );
+
+            const travelNearest = this.travelTimeMinutes(
+                techLocations[nearestIdx],
+                box.location,
+                speedKmh
+            );
+            const costNearest =
+                assignments[nearestIdx].totalTimeMinutes +
+                travelNearest +
+                box.fixTimeMinutes;
+
+            if (costNearest <= deadlineMinutes) {
+                assignments[nearestIdx].assignedBoxIds.push(box.id);
+                assignments[nearestIdx].totalTimeMinutes = costNearest;
+                techLocations[nearestIdx] = box.location;
+                continue;
+            }
+
+            let bestIdx = -1;
+            let bestCost = Infinity;
+
+            for (let i = 0; i < numTechnicians; i++) {
+                if (i === nearestIdx) continue;
+                const travel = this.travelTimeMinutes(
+                    techLocations[i],
+                    box.location,
+                    speedKmh
+                );
+                const cost =
+                    assignments[i].totalTimeMinutes + travel + box.fixTimeMinutes;
+                if (cost <= deadlineMinutes && cost < bestCost) {
+                    bestCost = cost;
+                    bestIdx = i;
+                }
+            }
+
+            if (bestIdx === -1) return null;
+
+            assignments[bestIdx].assignedBoxIds.push(box.id);
+            assignments[bestIdx].totalTimeMinutes = bestCost;
+            techLocations[bestIdx] = box.location;
+        }
+
+        return assignments;
     }
 
     findMinimumTeamSize(
@@ -114,7 +213,48 @@ export class TeamSizer {
         boxes: Box[],
         deadlineMinutes: number
     ): TeamSizeResult {
-        // TODO: implement this method
-        throw new Error('Not implemented');
+        if (boxes.length === 0) {
+            return {
+                techniciansNeeded: 0,
+                assignments: [],
+                feasible: true,
+            };
+        }
+
+        for (const box of boxes) {
+            const solo =
+                this.travelTimeMinutes(startLocation, box.location, speedKmh) +
+                box.fixTimeMinutes;
+            if (solo > deadlineMinutes) {
+                return {
+                    techniciansNeeded: boxes.length,
+                    assignments: [],
+                    feasible: false,
+                };
+            }
+        }
+
+        for (let n = 1; n <= boxes.length; n++) {
+            const result = this.tryAssign(
+                startLocation,
+                speedKmh,
+                boxes,
+                n,
+                deadlineMinutes
+            );
+            if (result) {
+                return {
+                    techniciansNeeded: n,
+                    assignments: result,
+                    feasible: true,
+                };
+            }
+        }
+
+        return {
+            techniciansNeeded: boxes.length,
+            assignments: [],
+            feasible: false,
+        };
     }
 }
