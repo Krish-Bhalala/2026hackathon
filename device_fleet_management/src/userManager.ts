@@ -33,7 +33,7 @@ export class UserManager {
     // Get the list of all users who share the same email(from email index Map).
     const emailList = this.emailIndex.get(user.email);
     if (emailList) {
-      // filter out the user we're deleting (keep only users with different IDs).
+      // filter out the user we're deleting (keeping only users with different IDs).
       const updated = emailList.filter(u => u.id !== id);
       // delete the entire email entry if no user left with this email
       if (updated.length === 0) {
