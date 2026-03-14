@@ -78,8 +78,23 @@ export class TeamSizer {
         boxes: Box[],
         routeIds: string[]
     ): number | null {
-        // TODO: implement this method
-        throw new Error('Not implemented');
+        // sum over trip time and fixing time
+        let totalTimeInMinutes = 0
+
+        const boxMap = new Map<string, Box>()
+        for (const box of boxes) boxMap.set(box.id, box)
+
+        let prevLocation = startLocation
+        for (const routeId of routeIds) {
+            const box = boxMap.get(routeId)
+            if (!box) return null
+
+            totalTimeInMinutes += this.travelTimeMinutes(prevLocation, box.location, speedKmh)
+            totalTimeInMinutes += box.fixTimeMinutes
+            prevLocation = box.location
+        }
+
+        return totalTimeInMinutes
     }
 
     tryAssign(
